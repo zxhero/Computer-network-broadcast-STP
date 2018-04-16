@@ -171,7 +171,7 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 		struct stp_config *config)
 {
 	// TODO: handle config packet here
-	int pri = 0,i;
+	int pri = 0,i,flag = 0;
 	stp_port_t *t;
 	if(p->designated_root > ntohll(config->root_id)){   pri = 1;	}
 	else if(p->designated_root < ntohll(config->root_id));
@@ -183,6 +183,7 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
             else if(p->designated_switch < ntohll(config->switch_id));
             else{
                 if(p->designated_port > ntohs(config->port_id)){  pri = 1;    }
+                else if(p->designated_port == ntohs(config->port_id))   pri = -1;
             }
         }
     }
@@ -201,14 +202,33 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
                         t->designated_root = stp->designated_root;
                         t->designated_cost = stp->root_path_cost;
                 }
+                else{
+                     if(t->designated_root > stp->designated_root){   flag = 1;	}
+                     else if(t->designated_root == stp->designated_root){
+                        if(t->designated_cost > stp->root_path_cost){    flag = 1;    }
+                        else if(t->designated_cost == stp->root_path_cost){
+                            if(t->designated_switch > stp->switch_id){  flag = 1;     }
+                        }
+                    }
+                    if(flag == 1){
+                        t->designated_root = stp->designated_root;
+                        t->designated_cost = stp->root_path_cost;
+                        t->designated_switch = stp->switch_id;
+                        t->designated_port = t->port_id;
+                    }
+                }
             }
+            stp_stop_timer(&stp->hello_timer);
         }
         else{
 
         }
 	}
+	else if(pri == -1){
+        stp_send_config(stp);
+	}
 	else{
-
+        stp_port_send_config(p);
 	}
 	fprintf(stdout, "TODO: handle config packet here.\n");
 }
